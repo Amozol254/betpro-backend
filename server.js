@@ -8,7 +8,8 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const Database = require('better-sqlite3');
+let users = [];
+let bets = [];
 
 const app = express();
 const PORT = 5000;
