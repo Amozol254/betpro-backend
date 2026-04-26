@@ -495,7 +495,111 @@ function safeUser(user) {
     role: user.role
   };
 }
+const aviatorBets = new Map();
 
+function aviatorCrashPoint() {
+  const r = Math.random();
+  if (r < 0.5) return +(1.05 + Math.random() * 1.2).toFixed(2);
+  if (r < 0.85) return +(2 + Math.random() * 4).toFixed(2);
+  if (r < 0.97) return +(6 + Math.random() * 10).toFixed(2);
+  return +(16 + Math.random() * 30).toFixed(2);
+}
+
+app.post("/api/aviator/start", auth, async (req, res) => {
+  try {
+    const stake = Number(req.body.stake);
+
+    if (!stake || stake <= 0) {
+      return res.status(400).json({ message: "Valid stake required" });
+    }
+
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.balance < stake) {
+      return res.status(400).json({ message: "Insufficient balance" });
+    }
+
+    user.balance -= stake;
+    await user.save();
+
+    const betId = Date.now().toString() + Math.random().toString(36).slice(2);
+    const crashPoint = aviatorCrashPoint();
+
+    aviatorBets.set(betId, {
+      userId: user._id.toString(),
+      stake,
+      crashPoint,
+      status: "running"
+    });
+
+    res.json({
+      message: "Bet placed",
+      betId,
+      crashPoint,
+      balance: user.balance
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+app.post("/api/aviator/cashout", auth, async (req, res) => {
+  try {
+    const { betId } = req.body;
+    const multiplier = Number(req.body.multiplier);
+
+    const bet = aviatorBets.get(betId);
+
+    if (!bet) {
+      return res.status(404).json({ message: "Bet not found" });
+    }
+
+    if (bet.userId !== req.user.id) {
+      return res.status(403).json({ message: "Not your bet" });
+    }
+
+    if (bet.status !== "running") {
+      return res.status(400).json({ message: "Bet already settled" });
+    }
+
+    if (multiplier >= bet.crashPoint) {
+      bet.status = "lost";
+      return res.status(400).json({ message: "Too late. Plane crashed." });
+    }
+
+    const user = await User.findById(req.user.id);
+    const winnings = +(bet.stake * multiplier).toFixed(2);
+
+    user.balance += winnings;
+    await user.save();
+
+    bet.status = "won";
+    bet.winnings = winnings;
+
+    res.json({
+      message: "Cashout successful",
+      winnings,
+      balance: user.balance
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+app.post("/api/aviator/crash", auth, async (req, res) => {
+  const { betId } = req.body;
+  const bet = aviatorBets.get(betId);
+
+  if (bet) {
+    bet.status = "lost";
+  }
+
+  res.json({ message: "Bet closed" });
+});
 app.listen(PORT, () => {
   console.log(`BetPro API running on port ${PORT}`);
 });
