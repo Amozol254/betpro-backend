@@ -1,3 +1,8 @@
+res.json({
+  balance: user.balance,
+  betId: someId,
+  crashPoint: crashPoint
+});
 // BetPro Backend API - MongoDB + JWT + Wallet + Betting + Admin
 
 const express = require('express');
