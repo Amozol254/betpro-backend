@@ -499,4 +499,19 @@ function safeUser(user) {
 app.listen(PORT, () => {
   console.log(`BetPro API running on port ${PORT}`);
 });
-    
+    app.post('/api/aviator/start', auth, async (req, res) => {
+  const { stake } = req.body;
+
+  const user = await User.findById(req.user.id);
+
+  if (!user) return res.status(404).json({ message: 'User not found' });
+
+  if (user.balance < stake) {
+    return res.status(400).json({ message: 'Not enough money' });
+  }
+
+  user.balance -= stake;
+  await user.save();
+
+  res.json({ balance: user.balance });
+});
